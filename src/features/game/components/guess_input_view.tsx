@@ -64,7 +64,7 @@ export function GuessInputView({ joke, userId }: GuessInputViewProps) {
           <p className="muted-copy">
             {isFallbackJoke
               ? 'Local fallback mode: rendering works, but submission is disabled until a database joke exists.'
-              : 'Submit once to unlock everyone else&apos;s guesses.'}
+              : "Submit once to unlock everyone else's guesses."}
           </p>
           <Button disabled={submitGuessMutation.isPending || isFallbackJoke} type="submit">
             {submitGuessMutation.isPending ? 'Scoring...' : 'Submit Guess'}
