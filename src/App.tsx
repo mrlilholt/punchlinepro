@@ -2,6 +2,7 @@ import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 
 import { AuthGateContainer } from './features/auth/components/auth_gate_container';
 import { FavoritesPage } from './features/leaderboard/components/favorites_page';
+import { BonusJokeBroadcastPanel } from './features/game/components/bonus_joke_broadcast_panel';
 import { GameplayContainer } from './features/game/components/gameplay_container';
 import { ReleaseCountdownPanel } from './features/game/components/release_countdown_panel';
 import { JokeHistoryPanel } from './features/leaderboard/components/joke_history_panel';
@@ -20,6 +21,7 @@ function HomePage({ userId }: { userId: string }) {
       <aside className="sidebar-stack">
         <LeaderboardPanel />
         <JokeHistoryPanel userId={userId} />
+        <BonusJokeBroadcastPanel userId={userId} />
       </aside>
     </main>
   );

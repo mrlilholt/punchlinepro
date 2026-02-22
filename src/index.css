@@ -440,6 +440,76 @@ body {
   font-weight: 600;
 }
 
+.bonus-joke-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.bonus-joke-form-shell {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #ffe0d5;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 115, 97, 0.08), transparent 55%),
+    #fffaf8;
+}
+
+.bonus-joke-textarea {
+  min-height: 86px;
+}
+
+.bonus-joke-textarea-short {
+  min-height: 72px;
+}
+
+.bonus-joke-helper {
+  margin: 0;
+}
+
+.bonus-joke-broadcast-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.bonus-joke-broadcast-header {
+  margin: 0;
+}
+
+.bonus-joke-feature {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #ffdccc;
+  border-radius: 16px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 109, 89, 0.14), transparent 58%),
+    linear-gradient(180deg, #fff8f4 0%, #fff 100%);
+}
+
+.bonus-joke-punchline {
+  margin: 0;
+  color: #5a2e3b;
+  font-weight: 700;
+  font-size: 1.02rem;
+}
+
+.bonus-joke-recent-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.bonus-joke-row {
+  border-top: 1px solid #ffe7de;
+  padding-top: 8px;
+}
+
+.bonus-joke-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
 .guess-row,
 .leader-row {
   border-top: 1px solid #ffe4dc;
@@ -496,5 +566,13 @@ body {
 
   .joke-history-row-header {
     flex-direction: column;
+  }
+
+  .bonus-joke-form-shell .form-footer {
+    align-items: stretch;
+  }
+
+  .bonus-joke-form-shell .form-footer .ui-button {
+    width: 100%;
   }
 }

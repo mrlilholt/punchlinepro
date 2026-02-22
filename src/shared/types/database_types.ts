@@ -51,6 +51,22 @@ export interface LeaderboardRecord {
   total_score: number;
 }
 
+export interface BonusJokeRecord {
+  id: string;
+  user_id: string;
+  setup: string;
+  punchline: string;
+  created_at: string;
+  profiles:
+    | {
+        display_name: string | null;
+      }
+    | {
+        display_name: string | null;
+      }[]
+    | null;
+}
+
 export interface JokeHistoryBaseRecord {
   id: string;
   joke_date: string;

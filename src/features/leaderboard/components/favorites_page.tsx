@@ -1,3 +1,4 @@
+import { BonusJokeBroadcastPanel } from '../../game/components/bonus_joke_broadcast_panel';
 import { ReleaseCountdownPanel } from '../../game/components/release_countdown_panel';
 import { JokeHistoryPanel } from './joke_history_panel';
 import { LeaderboardPanel } from './leaderboard_panel';
@@ -21,6 +22,7 @@ export function FavoritesPage({ userId }: FavoritesPageProps) {
       </section>
       <aside className="sidebar-stack">
         <LeaderboardPanel />
+        <BonusJokeBroadcastPanel userId={userId} />
       </aside>
     </main>
   );
