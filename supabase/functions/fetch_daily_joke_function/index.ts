@@ -20,6 +20,17 @@ interface FallbackJokeRow {
   punchline: string;
 }
 
+interface UsedJokeRow {
+  punchline: string | null;
+  setup: string | null;
+  source_api_id: string | null;
+}
+
+interface UsedJokeLookup {
+  usedFingerprints: Set<string>;
+  usedSourceApiIds: Set<string>;
+}
+
 type ReleaseSlot = 'AM' | 'PM';
 
 const response_headers = {
@@ -56,6 +67,22 @@ function json_response(body: JsonValue, status = 200): Response {
 
 function normalize_whitespace(raw_text: string): string {
   return raw_text.replace(/\s+/g, ' ').trim();
+}
+
+function build_joke_fingerprint(setup: string, punchline: string): string {
+  return `${normalize_whitespace(setup).toLowerCase()}|||${normalize_whitespace(punchline).toLowerCase()}`;
+}
+
+function is_joke_already_used(
+  joke_candidate: ParsedJokeCandidate,
+  used_joke_lookup: UsedJokeLookup,
+): boolean {
+  return (
+    used_joke_lookup.usedSourceApiIds.has(joke_candidate.source_api_id) ||
+    used_joke_lookup.usedFingerprints.has(
+      build_joke_fingerprint(joke_candidate.setup, joke_candidate.punchline),
+    )
+  );
 }
 
 function format_utc_date_key(date_value: Date): string {
@@ -205,7 +232,41 @@ function get_target_release_slot(url: URL): ReleaseSlot {
   return provided_slot;
 }
 
-async function fetch_question_answer_joke_from_api(): Promise<ParsedJokeCandidate | null> {
+async function fetch_used_joke_lookup(
+  supabase_admin: ReturnType<typeof createClient>,
+): Promise<UsedJokeLookup> {
+  const { data, error } = await supabase_admin
+    .from('daily_jokes')
+    .select('source_api_id, setup, punchline')
+    .order('created_at', { ascending: false })
+    .limit(5000);
+
+  if (error) {
+    throw new Error(`Unable to load existing jokes: ${error.message}`);
+  }
+
+  const usedSourceApiIds = new Set<string>();
+  const usedFingerprints = new Set<string>();
+
+  ((data ?? []) as UsedJokeRow[]).forEach((usedJokeRow) => {
+    if (typeof usedJokeRow.source_api_id === 'string' && usedJokeRow.source_api_id) {
+      usedSourceApiIds.add(usedJokeRow.source_api_id);
+    }
+
+    if (typeof usedJokeRow.setup === 'string' && typeof usedJokeRow.punchline === 'string') {
+      usedFingerprints.add(build_joke_fingerprint(usedJokeRow.setup, usedJokeRow.punchline));
+    }
+  });
+
+  return {
+    usedFingerprints,
+    usedSourceApiIds,
+  };
+}
+
+async function fetch_question_answer_joke_from_api(
+  used_joke_lookup: UsedJokeLookup,
+): Promise<ParsedJokeCandidate | null> {
   const joke_api_url = Deno.env.get('JOKE_API_URL') ?? default_joke_api_url;
   const max_attempts = Number(Deno.env.get('JOKE_API_MAX_ATTEMPTS') ?? '8');
 
@@ -228,7 +289,7 @@ async function fetch_question_answer_joke_from_api(): Promise<ParsedJokeCandidat
       const payload = (await response.json()) as unknown;
       const parsed_candidate = parse_provider_payload(payload);
 
-      if (parsed_candidate) {
+      if (parsed_candidate && !is_joke_already_used(parsed_candidate, used_joke_lookup)) {
         return parsed_candidate;
       }
     } catch (_error) {
@@ -252,6 +313,7 @@ function pick_random_fallback_row(rows: FallbackJokeRow[]): FallbackJokeRow | nu
 
 async function fetch_fallback_joke(
   supabase_admin: ReturnType<typeof createClient>,
+  used_joke_lookup: UsedJokeLookup,
 ): Promise<ParsedJokeCandidate> {
   const { data, error } = await supabase_admin
     .from('fallback_jokes')
@@ -260,36 +322,47 @@ async function fetch_fallback_joke(
     .limit(200);
 
   if (!error && Array.isArray(data)) {
-    const fallback_row = pick_random_fallback_row(data as FallbackJokeRow[]);
+    const parsedFallbackCandidates = (data as FallbackJokeRow[])
+      .map((fallback_row) =>
+        coerce_explicit_setup_punchline(
+          fallback_row.setup,
+          fallback_row.punchline,
+          `fallback:${fallback_row.id}`,
+        ),
+      )
+      .filter((candidate): candidate is ParsedJokeCandidate => Boolean(candidate))
+      .filter((candidate) => !is_joke_already_used(candidate, used_joke_lookup));
 
-    if (fallback_row) {
-      const parsed_fallback_joke = coerce_explicit_setup_punchline(
-        fallback_row.setup,
-        fallback_row.punchline,
-        `fallback:${fallback_row.id}`,
-      );
+    const fallback_candidate =
+      parsedFallbackCandidates[
+        Math.floor(Math.random() * parsedFallbackCandidates.length)
+      ] ?? null;
 
-      if (parsed_fallback_joke) {
-        return parsed_fallback_joke;
-      }
+    if (fallback_candidate) {
+      return fallback_candidate;
     }
   }
 
-  const memory_fallback_row =
-    in_memory_fallback_jokes[
-      Math.floor(Math.random() * in_memory_fallback_jokes.length)
-    ] ?? in_memory_fallback_jokes[0];
+  const memoryCandidates = in_memory_fallback_jokes
+    .map((fallbackRow, index) =>
+      coerce_explicit_setup_punchline(
+        fallbackRow.setup,
+        fallbackRow.punchline,
+        `fallback:in-memory:${index}`,
+      ),
+    )
+    .filter((candidate): candidate is ParsedJokeCandidate => Boolean(candidate))
+    .filter((candidate) => !is_joke_already_used(candidate, used_joke_lookup));
 
-  return (
-    coerce_explicit_setup_punchline(
-      memory_fallback_row.setup,
-      memory_fallback_row.punchline,
-      'fallback:in-memory',
-    ) ?? {
-      punchline: 'Because their horns do not work.',
-      setup: 'Why do cows wear bells?',
-      source_api_id: 'fallback:in-memory-default',
-    }
+  const memoryCandidate =
+    memoryCandidates[Math.floor(Math.random() * memoryCandidates.length)] ?? null;
+
+  if (memoryCandidate) {
+    return memoryCandidate;
+  }
+
+  throw new Error(
+    'No unused fallback jokes are available. Add more fallback jokes or raise API attempts.',
   );
 }
 
@@ -354,8 +427,34 @@ Deno.serve(async (request) => {
     }
   }
 
-  const api_joke = await fetch_question_answer_joke_from_api();
-  const selected_joke = api_joke ?? (await fetch_fallback_joke(supabase_admin));
+  let used_joke_lookup: UsedJokeLookup;
+  try {
+    used_joke_lookup = await fetch_used_joke_lookup(supabase_admin);
+  } catch (error) {
+    return json_response(
+      { error: error instanceof Error ? error.message : 'Failed to load used joke history.' },
+      500,
+    );
+  }
+
+  const api_joke = await fetch_question_answer_joke_from_api(used_joke_lookup);
+
+  let selected_joke: ParsedJokeCandidate;
+  try {
+    selected_joke = api_joke ?? (await fetch_fallback_joke(supabase_admin, used_joke_lookup));
+  } catch (error) {
+    return json_response(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'No non-repeating joke candidate is currently available.',
+        stage: 'select-non-repeating-joke',
+      },
+      409,
+    );
+  }
+
   const joke_source = api_joke ? 'api' : 'fallback';
 
   const { data: saved_joke, error: upsert_error } = await supabase_admin
