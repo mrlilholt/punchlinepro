@@ -12,7 +12,7 @@ interface GameplayContainerProps {
 }
 
 export function GameplayContainer({ userId }: GameplayContainerProps) {
-  const dailyJokeQuery = useDailyJokeQueryHook();
+  const dailyJokeQuery = useDailyJokeQueryHook(userId);
   const activeJokeIdForGuessStatus =
     dailyJokeQuery.data && !dailyJokeQuery.data.is_fallback
       ? dailyJokeQuery.data.id

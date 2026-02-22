@@ -30,6 +30,9 @@ export function useSubmitGuessMutationHook(
       await query_client.invalidateQueries({
         queryKey: ['user-guess-status', userId, jokeId],
       });
+      await query_client.invalidateQueries({
+        queryKey: ['joke-history', userId],
+      });
     },
   });
 }

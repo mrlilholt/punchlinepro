@@ -8,6 +8,11 @@ interface LocalReleaseSlotContext {
   nextReleaseDate: Date;
 }
 
+export interface LocalReleaseCandidate {
+  dateKey: string;
+  slot: ReleaseSlotType;
+}
+
 function format_local_date_key(date_value: Date): string {
   const year = date_value.getFullYear();
   const month = String(date_value.getMonth() + 1).padStart(2, '0');
@@ -29,6 +34,27 @@ export function get_local_yesterday_date_key(): string {
 
 function get_release_slot_for_local_time(date_value: Date): ReleaseSlotType {
   return date_value.getHours() < 12 ? 'AM' : 'PM';
+}
+
+function get_previous_release_candidate(
+  dateKeySourceDate: Date,
+  slot: ReleaseSlotType,
+): LocalReleaseCandidate {
+  const previousDate = new Date(dateKeySourceDate);
+
+  if (slot === 'PM') {
+    return {
+      dateKey: format_local_date_key(previousDate),
+      slot: 'AM',
+    };
+  }
+
+  previousDate.setDate(previousDate.getDate() - 1);
+
+  return {
+    dateKey: format_local_date_key(previousDate),
+    slot: 'PM',
+  };
 }
 
 export function get_release_slot_sort_value(slot: ReleaseSlotType): number {
@@ -70,6 +96,35 @@ export function get_local_release_slot_context(now = new Date()): LocalReleaseSl
     fallbackSlot,
     nextReleaseDate,
   };
+}
+
+export function get_recent_local_release_candidates(
+  maxPreviousSlots: number,
+  now = new Date(),
+): LocalReleaseCandidate[] {
+  const totalSlots = Math.max(0, Math.floor(maxPreviousSlots)) + 1;
+  const currentDate = new Date(now);
+
+  let cursor: LocalReleaseCandidate = {
+    dateKey: format_local_date_key(currentDate),
+    slot: get_release_slot_for_local_time(currentDate),
+  };
+
+  const releaseCandidates: LocalReleaseCandidate[] = [];
+
+  for (let index = 0; index < totalSlots; index += 1) {
+    releaseCandidates.push(cursor);
+
+    const cursorDate = new Date(currentDate);
+    const [year, month, day] = cursor.dateKey.split('-').map(Number);
+    cursorDate.setFullYear(year ?? cursorDate.getFullYear());
+    cursorDate.setMonth((month ?? cursorDate.getMonth() + 1) - 1);
+    cursorDate.setDate(day ?? cursorDate.getDate());
+
+    cursor = get_previous_release_candidate(cursorDate, cursor.slot);
+  }
+
+  return releaseCandidates;
 }
 
 export function format_countdown_clock(totalMilliseconds: number): string {

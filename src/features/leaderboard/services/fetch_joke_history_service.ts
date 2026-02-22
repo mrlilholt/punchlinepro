@@ -14,6 +14,11 @@ interface JokeFavoriteRow {
   joke_id: string;
 }
 
+interface UserGuessHistoryRow {
+  created_at: string;
+  joke_id: string;
+}
+
 function coerce_release_slot(slot: unknown): ReleaseSlotType {
   return slot === 'PM' ? 'PM' : 'AM';
 }
@@ -21,9 +26,37 @@ function coerce_release_slot(slot: unknown): ReleaseSlotType {
 export async function fetch_joke_history_service(
   userId: string,
 ): Promise<JokeHistoryListItem[]> {
+  const { data: userGuessRows, error: userGuessRowsError } = await supabase_client
+    .from('guesses')
+    .select('joke_id, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(120);
+
+  if (userGuessRowsError) {
+    throw userGuessRowsError;
+  }
+
+  const answeredJokeIds: string[] = [];
+  const seenJokeIds = new Set<string>();
+
+  ((userGuessRows ?? []) as UserGuessHistoryRow[]).forEach((guessRow) => {
+    if (!guessRow.joke_id || seenJokeIds.has(guessRow.joke_id)) {
+      return;
+    }
+
+    seenJokeIds.add(guessRow.joke_id);
+    answeredJokeIds.push(guessRow.joke_id);
+  });
+
+  if (!answeredJokeIds.length) {
+    return [];
+  }
+
   const { data: jokeRows, error: jokeRowsError } = await supabase_client
     .from('daily_jokes')
     .select('id, joke_date, release_slot, setup, punchline, source_api_id')
+    .in('id', answeredJokeIds)
     .order('joke_date', { ascending: false })
     .order('release_slot', { ascending: false })
     .limit(40);
